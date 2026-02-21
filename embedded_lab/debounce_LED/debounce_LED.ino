@@ -49,7 +49,6 @@ void setup() {
       if((prev_stable_state == 1) && (stable_state == 0)){
         led_state ^= 1;
         *gpio_out = (*gpio_out&~(1u << 2))|(led_state << 2);
-        prev_stable_state = stable_state;
       }
       prev_stable_state = stable_state;
     }
