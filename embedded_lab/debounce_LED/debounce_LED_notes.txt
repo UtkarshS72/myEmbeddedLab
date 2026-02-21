@@ -1,0 +1,14 @@
+Button bounce causes multiple transitions
+
+we can't use a while loop for the measurement window because it will block the cpu
+
+we need to make changes based on changes in state rather than states themselves. i.e we are detecting events (the event being a change in state), not detecting states to make our decisions.
+
+we wait for the bouncing to stabilize before deciding whether or not to update the state. we do this by restarting the timer after each bounce, after the final bounce, the value will be stable, and 
+the timer goes for long enough to cross the window. 
+
+Then we update the state only if what we write to it is different from it's current value, otherwise there is no point. 
+
+(prev_stable_state == 1) && (stable_state == 0) ensure only the press will toggle. 
+
+prev_stable_state = stable_state will update the state
