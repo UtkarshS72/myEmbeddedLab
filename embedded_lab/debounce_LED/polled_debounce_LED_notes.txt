@@ -23,7 +23,7 @@ while(1) {
 
 for every input: 
 MCU_SEL
-FUN_IE
+FUN_IE  enables input buffer, so gpio_in_reg can copy those values
 FUN_WPU
 FUN_WPD
 all the above should be configured
