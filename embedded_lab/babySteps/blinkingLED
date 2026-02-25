@@ -1,0 +1,24 @@
+#include <stdint.h>
+
+#define GPIO_OUT_REG    0x3FF44004
+#define GPIO_ENABLE_REG 0x3FF44020
+
+void setup() {
+
+    volatile uint32_t *gpio_out = (uint32_t*) GPIO_OUT_REG;
+    volatile uint32_t *gpio_en  = (uint32_t*) GPIO_ENABLE_REG;
+
+    *gpio_en |= (1 << 2);
+
+    while(1){
+        *gpio_out |= (1 << 2);
+
+        for(int i = 0; i < 10000000; i++);  // delay
+
+        *gpio_out &= ~(1 << 2);
+
+        for(int i = 0; i < 10000000; i++);  // delay
+    }
+}
+
+void loop(){}
