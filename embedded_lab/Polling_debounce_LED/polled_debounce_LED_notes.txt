@@ -1,29 +1,96 @@
-Mechanical buttons bounce, causeing multiple transitions very quickly. We will wait for enough time to pass for the bouncing to end, and take that final value. 
+/*
+=======================================================================
+  POLLED BUTTON DEBOUNCE  
 
-we can't use a while loop for the measurement window because it will block the cpu
+Problem:
+Mechanical pushbuttons do not switch cleanly.
+The contacts physically bounce for a few ms, producing many rapid
+transitions (1→0→1→0→0→1...) instead of one press.
 
-we need to make changes based on changes in state rather than states themselves. i.e we are detecting events (the event being a change in state), not detecting states to make our decisions.
+If raw input is used directly:
+one press → multiple actions.
 
-we wait for the bouncing to stabilize before deciding whether or not to update the state. we do this by restarting the timer after each bounce, after the final bounce, the value will be stable, and the timer goes for long enough to cross the window. 
+_______________________________________________________________________
 
-Then we update the state only if what we write to it is different from it's current value, otherwise there is no point. 
+Debounce idea:
+We do not trust instantaneous readings.
 
-(prev_stable_state == 1) && (stable_state == 0) ensure only the press will toggle. 
+Algorithm:
+1) Detect a change in the raw signal
+2) Start a timer
+3) Any further change → restart timer
+4) When input stays unchanged long enough → accept it
 
-prev_stable_state = stable_state will update the state
+The last stable value is the real button state.
 
-GPIO_IN_REG needs FUN_IE, otherwise it will simply ignore the value the pin is getting.
+_______________________________________________________________________
 
-need to clearly specify both pullup and pulldown
+Event vs State:
+We react to a CHANGE, not to a level.
 
-this version is polling: cpu is repeatedly checking status of hardware, like 
-while(1) {
-    raw = ((*gpio_in >> 5) & 1);
+Holding the button should NOT repeatedly trigger the action.
+
+We detect a falling edge:
+(prev_stable_state == 1) && (stable_state == 0)
+
+This gives exactly one event per press.
+
+_______________________________________________________________________
+Why polling is inefficient:
+while(1){
+    raw = GPIO_IN_REG...
 }
 
-for every input: 
-MCU_SEL
-FUN_IE  enables input buffer, so gpio_in_reg can copy those values
-FUN_WPU
-FUN_WPD
-all the above should be configured
+CPU repeatedly asks hardware:
+"did the button change?"
+
+This is busy waiting.
+CPU is occupied doing nothing useful.
+
+_______________________________________________________________________
+
+GPIO input configuration (required for correct reads):
+
+MCU_SEL  --> select GPIO function
+FUN_IE   --> enable digital input buffer (GPIO_IN_REG reads from here)
+FUN_WPU  --> pull-up for stable HIGH when unpressed
+FUN_WPD  --> must be disabled when using pull-up
+GPIO_ENABLE bit cleared --> input mode
+
+Without pull-up:
+pin floats --> random readings.
+
+__________________________________________________________________________
+
+Why we wait instead of blocking:
+We DO NOT use a while-delay measurement window.
+
+Blocking would freeze the CPU.
+
+Instead:
+we repeatedly check elapsed time while the program continues running.
+
+_________________________________________________________________________
+
+Stable state update:
+After debounce window:
+
+if(raw != stable_state)
+    stable_state = raw;
+
+Only accept new stable values.
+Prevents false retriggers.
+
+_________________________________________________________________________
+
+Summary:
+This version implements:
+• software debouncing
+• edge detection
+• event-based behavior
+• correct GPIO pad configuration
+
+Still polling: CPU constantly checks hardware state.
+Interrupt version will remove this waiting.
+========================================================================== 
+*/
