@@ -59,3 +59,94 @@ void loop() {
       prev_stable_state = stable_state;
     }  
 }
+
+
+
+/*
+INTERRUPT-DRIVEN DEBOUNCE 
+
+The program has 2 independent execution contexts:
+
+1) main loop --> normal program flow
+2) ISR       --> asynchronous hardware event (button edge)
+
+The ISR can interrupt the CPU at ANY instruction boundary.
+It is not part of the normal program order.
+
+Because both contexts access the same variables, special handling
+is required to prevent race conditions and inconsistent reads.
+*/
+
+/*
+IRAM_ATTR:
+
+On ESP32 most code executes from external flash through a cache.
+During certain hardware events the flash cache may be temporarily disabled.
+
+If an interrupt occurs while the cache is disabled and the ISR lives in flash,
+the CPU cannot fetch instructions --> crash/reset.
+
+IRAM_ATTR forces the ISR code into internal instruction RAM (IRAM),
+so the interrupt can always execute safely.
+*/
+
+/*
+volatile shared variables:
+
+Variables modified inside an ISR MUST be declared volatile.
+
+Reason:
+The compiler normally assumes memory does not change unless the program
+writes to it. It may cache values in registers and reuse them.
+
+An ISR changes memory outside the normal program flow.
+Without volatile, the compiler may reuse a stale register value and
+the main program will never observe the change.
+
+volatile tells the compiler:
+"this memory may change at any time — always reread it from memory".
+*/
+
+/*
+Atomic snapshot (critical section):
+
+The ISR can update shared variables at any time.
+If the main loop reads them while an interrupt occurs, it may read
+half old and half new values --> race condition.
+
+Therefore we briefly disable interrupts while copying shared variables
+into local variables.
+
+We do NOT keep interrupts disabled during processing.
+We only disable them long enough to take a consistent snapshot.
+*/
+
+/*
+Why copy to local variables?
+
+After interrupts are re-enabled, the ISR may run again immediately.
+
+The program must operate on a stable moment in time, not a moving target.
+
+Local copies represent:
+"the exact state of the system at one instant".
+
+All debounce decisions are made using the snapshot, not the live variables.
+*/
+
+/*
+ISR design rule:
+
+The ISR does NOT implement debounce logic.
+It does NOT toggle the LED.
+It does NOT perform long calculations.
+
+The ISR only records:
+    - the raw pin level
+    - the time the change occurred
+
+Processing is deferred to the main loop.
+
+Reason:
+ISRs must be short, deterministic, and non-blocking.
+*/
