@@ -1,0 +1,49 @@
+#include <Arduino.h> 
+#include <stdint.h> 
+#define GPIO_OUT_REG 0x3FF44004 
+#define GPIO_ENABLE_REG 0x3FF44020 
+#define GPIO_IN_REG 0x3FF4403C 
+static inline uint32_t cpu_cycles() { 
+  uint32_t ccount; asm volatile ("rsr %0, ccount" : "=a"(ccount)); return ccount; 
+} 
+  
+void setup() { Serial.begin(115200); 
+  
+  volatile uint32_t *gpio_out = (uint32_t*) GPIO_OUT_REG;
+  volatile uint32_t *gpio_en = (uint32_t*) GPIO_ENABLE_REG; 
+  volatile uint32_t *gpio_in = (uint32_t*) GPIO_IN_REG; // LED on GPIO2 
+  
+  *gpio_en |= (1u << 2); // Button on GPIO5 with pull-up 
+  pinMode(5, INPUT_PULLUP); *gpio_en &= ~(1u << 5); // ensure input 
+  int last = ((*gpio_in) >> 5) & 1; // last value measured at 5th bit 
+  int led_state = 0; 
+  
+  while (1) { 
+    int now = ((*gpio_in) >> 5) & 1; // current value at 5th bit (changes constantly as loop runs) 
+  
+    if (last != now) { // edge detected 
+    
+      uint32_t edge_at = cpu_cycles(); // when the first button press was detected 
+      uint32_t window = 2400000; // ~10ms at 240MHz (approx), window is approx 10ms 
+      int transitions = 1; 
+      int prev = now; 
+    
+      while ((uint32_t)(cpu_cycles() - edge_at) < window) { 
+        int measure = ((*gpio_in) >> 5) & 1; 
+        if (measure != prev) { 
+          transitions++; prev = measure; 
+          }
+      } 
+      Serial.print("Edge "); 
+      Serial.print(last); 
+      Serial.print("->"); 
+      Serial.print(now); 
+      Serial.print(" transitions_in_10ms="); 
+      Serial.println(transitions); 
+      last = now; 
+      led_state ^= last; 
+      *gpio_out = (*gpio_out&~(1 << 2))|(led_state << 2); 
+    } 
+  } 
+} 
+void loop() {}
